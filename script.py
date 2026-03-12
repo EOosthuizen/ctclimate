@@ -26,3 +26,5 @@ ct_df['year'] = ct_df['dt'].dt.year
 print(ct_df.head(10))
 print(ct_df.info())
 print("Cape Town has environmental data from ", min(ct_df['year']), " to ", max(ct_df['year']))
+
+#Also, successfully integrated this project onto GitHub!
