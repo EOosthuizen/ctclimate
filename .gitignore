@@ -1,0 +1,7 @@
+# Large data files
+GlobalLandTemperaturesByMajorCity.csv
+
+# Environment folders
+.venv/
+.conda/
+venv/
