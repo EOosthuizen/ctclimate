@@ -45,4 +45,19 @@ ct_df['season'] = ct_df['month'].apply(get_season)
 ct_season_df_preview = pd.concat([ct_df.head(5), ct_df.tail(5)], ignore_index=True)
 print(ct_season_df_preview)
 
+### Day 3 ###
+
+# Create pivot table to inspect trends
+season_trends = ct_df.pivot_table(values = 'AverageTemperature',
+                                  index = 'year',
+                                  columns = 'season')
+winter_trend = season_trends['Winter'].dropna().tail(50) # annual temperature series for winter seasons
+print(winter_trend.describe()) # inspect summary statistics for winter temperatures
+first_decade_avg = winter_trend.head(10).mean() # calculate average temperature during first decade (starting 1964)
+last_decade_avg = winter_trend.tail(10).mean() # calculate average temperature during first decade (ending 2013)
+temp_shift = last_decade_avg - first_decade_avg
+print(f"\n ---------- \nAverage winter temperature in first decade (1964 - 1973): {first_decade_avg:.2f} °C")
+print(f"Average winter temperature in last decade (2004 - 2013): {last_decade_avg:.2f} °C")
+print(f"Five-decade winter temperature shift: {temp_shift:.2f} °C")
+
 
