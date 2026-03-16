@@ -1,5 +1,8 @@
 # Import libraries and assign aliases for quick reference
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+#from scipy import stats
 
 ### Day 1 ###
 
@@ -60,4 +63,19 @@ print(f"\n ---------- \nAverage winter temperature in first decade (1964 - 1973)
 print(f"Average winter temperature in last decade (2004 - 2013): {last_decade_avg:.2f} °C")
 print(f"Five-decade winter temperature shift: {temp_shift:.2f} °C")
 
+### Day 4 ###
 
+# Configure seaborn and plot winter temperature regression
+sns.set_theme(style = 'whitegrid', context = 'talk')
+sns.set_palette('colorblind')
+winter_data = ct_df[ct_df['season'] == "Winter"].groupby('year')['AverageTemperature'].mean().reset_index() # combine winter data into mean annual temperatures
+winter_data_five_decades = winter_data.tail(50)
+plt.figure(figsize=(12, 6))
+sns.regplot(data=winter_data_five_decades, x='year', y='AverageTemperature',
+            scatter_kws={'s': 50, 'alpha': 0.6},
+            line_kws={'color': 'darkred', 'lw': 3})
+plt.title('Cape Town: winter warming trend (last 50 years)')
+plt.xlabel('Year')
+plt.ylabel('Average winter temp (°C)')
+plt.tight_layout()
+plt.show()
