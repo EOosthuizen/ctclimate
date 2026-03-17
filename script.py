@@ -93,7 +93,13 @@ r_squared = r_value ** 2
 #print(stats_text)
 
 # Create annotated regression plot function
-def plot_climate_trend(climate_df, plot_title, x_lab, y_lab, slope_val, r2_val):
+def plot_climate_trend(climate_df: pd.DataFrame,
+                       plot_title: str,
+                       x_lab: str,
+                       y_lab: str,
+                       slope_val: float,
+                       r2_val: float
+                       ) -> None:
     plt.figure(figsize=(12, 6))
     ax = sns.regplot(data=climate_df, x='year', y='AverageTemperature', line_kws={'color': 'red'})
     stats_text = f"Slope: {slope_val:.4f}\n$R^2$: {r2_val:.4f}"
