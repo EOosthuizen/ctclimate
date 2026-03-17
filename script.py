@@ -2,7 +2,7 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-#from scipy import stats
+from scipy import stats
 
 ### Day 1 ###
 
@@ -70,6 +70,7 @@ sns.set_theme(style = 'whitegrid', context = 'talk')
 sns.set_palette('colorblind')
 winter_data = ct_df[ct_df['season'] == "Winter"].groupby('year')['AverageTemperature'].mean().reset_index() # combine winter data into mean annual temperatures
 winter_data_five_decades = winter_data.tail(50)
+# Create plot
 plt.figure(figsize=(12, 6))
 sns.regplot(data=winter_data_five_decades, x='year', y='AverageTemperature',
             scatter_kws={'s': 50, 'alpha': 0.6},
@@ -79,3 +80,32 @@ plt.xlabel('Year')
 plt.ylabel('Average winter temp (°C)')
 plt.tight_layout()
 plt.show()
+
+### Day 5 ###
+
+# Calculate regression statistics
+slope, intercept, r_value, p_value, std_err = stats.linregress(
+    winter_data_five_decades['year'],
+    winter_data_five_decades['AverageTemperature']
+)
+r_squared = r_value ** 2
+#stats_text = f'Slope: {slope:.4f} °C/year\n$R^2$: {r_squared:.4f}\np-value: {p_value:.4f}' #
+#print(stats_text)
+
+# Create annotated regression plot function
+def plot_climate_trend(climate_df, plot_title, x_lab, y_lab, slope_val, r2_val):
+    plt.figure(figsize=(12, 6))
+    ax = sns.regplot(data=climate_df, x='year', y='AverageTemperature', line_kws={'color': 'red'})
+    stats_text = f"Slope: {slope_val:.4f}\n$R^2$: {r2_val:.4f}"
+    ax.text(0.8255, 0.0288, stats_text, transform=ax.transAxes, bbox=dict(facecolor='white', alpha=1, boxstyle='square', edgecolor='black', linewidth=0.8))
+    plt.title(plot_title)
+    plt.xlabel(x_lab)
+    plt.ylabel(y_lab)
+
+    plt.show()
+
+# Create plot annotated with regression statistics
+title = 'Cape Town: winter warming trend (last 50 years)'
+x_label = 'Year'
+y_label = 'Average winter temp (°C)'
+plot_climate_trend(winter_data_five_decades, title, x_label, y_label, slope, r_squared)
