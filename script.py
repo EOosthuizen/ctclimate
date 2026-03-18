@@ -8,28 +8,33 @@ import numpy as np
 ### Day 1 ###
 
 # Read spreadsheet containing data
-df = pd.read_csv('GlobalLandTemperaturesByMajorCity.csv')
-
-# Inspect data frame
-#print(df.head(10))  # to see first 10 lines
-#print(df.info())  # to see variable types
+global_df = pd.read_csv('GlobalLandTemperaturesByMajorCity.csv')
 
 # Inspect unique cities in dataset
-cities = df['City'].unique()
-#print(cities)
-print(f"\n----------\nTotal unique cities found: {len(cities)}\n----------\n")
+def find_cities(kaggle_dataset: pd.DataFrame,
+                country: str = None):
+    if country is None:
+        cities = kaggle_dataset['City'].unique()
+        find_cities_out: str = (f"\n----------\nFound {len(cities)} unique cities across {len(kaggle_dataset['Country'].unique())} countries total:\n"
+                                f"{cities}")
+    elif country in kaggle_dataset['Country'].unique():
+        cities = kaggle_dataset[kaggle_dataset['Country'] == country]['City'].unique()
+        find_cities_out: str = (f"\n----------\nFound {len(cities)} unique cities within {country}:\n"
+                                f"{cities}")
+    else:
+        find_cities_out: str = f"{country} not found in dataset."
+    print(find_cities_out)
+
 
 ### Day 2 ###
 
 # Create data subset for Cape Town only
-ct_df = df[df['City'] == 'Cape Town'].copy()
+ct_df = global_df[global_df['City'] == 'Cape Town'].copy()
 
 # Process date-time string variable
 ct_df['dt'] = pd.to_datetime(ct_df['dt'])
 ct_df['year'] = ct_df['dt'].dt.year
-print("\n----------\nDisplaying 3 header lines for CT subset:\n", ct_df.head(3), "\n----------\n")
-#print(ct_df.info())
-print("Cape Town has environmental data from ", min(ct_df['year']), " to ", max(ct_df['year']), ". Displaying first and last 5 entries:")
+print(f"Cape Town has environmental data from {min(ct_df['year'])} to {max(ct_df['year'])}.")
 
 # Successfully integrated this project onto GitHub!
 
@@ -46,8 +51,6 @@ def get_season(month): # create a function that inputs a month variable and retu
 
 ct_df['month'] = ct_df['dt'].dt.month
 ct_df['season'] = ct_df['month'].apply(get_season)
-ct_season_df_preview = pd.concat([ct_df.head(5), ct_df.tail(5)], ignore_index=True)
-print(ct_season_df_preview)
 
 ### Day 3 ###
 
@@ -70,9 +73,9 @@ def season_trends(climate_df: pd.DataFrame,
         f"Mean temperature shift over the last {decades_timespan} decades: {temp_shift:.2f} °C\n")
     return season_trend_summary
 
-print(season_trends(climate_df = ct_df, season = 'Winter', decades_timespan = 5))
-print(season_trends(climate_df = ct_df, season = 'Winter', decades_timespan = 10))
-print(season_trends(climate_df = ct_df, season = 'Summer', decades_timespan = 10))
+#print(season_trends(climate_df = ct_df, season = 'Winter', decades_timespan = 5))
+#print(season_trends(climate_df = ct_df, season = 'Winter', decades_timespan = 10))
+#print(season_trends(climate_df = ct_df, season = 'Summer', decades_timespan = 10))
 
 ### Day 4 ###
 
@@ -90,7 +93,7 @@ plt.title('Cape Town: winter warming trend (last 50 years)')
 plt.xlabel('Year')
 plt.ylabel('Average winter temp (°C)')
 plt.tight_layout()
-plt.show()
+#plt.show() # winter temperature regression plot (no statistical annotation)
 
 ### Day 5 ###
 
@@ -124,7 +127,7 @@ def plot_climate_trend(climate_df: pd.DataFrame,
 title = 'Cape Town: winter warming trend (last 50 years)'
 x_label = 'Year'
 y_label = 'Average winter temp (°C)'
-plot_climate_trend(winter_data_five_decades, title, x_label, y_label, slope, r_squared)
+#plot_climate_trend(winter_data_five_decades, title, x_label, y_label, slope, r_squared)
 
 ### Day 6 ###
 
@@ -140,7 +143,7 @@ def get_century_string(year): # alternatively, define function to return century
         return "21st"
 
 winter_data['century'] = winter_data['year'].apply(get_century_string) # apply century labels to rows
-print(winter_data.head(), winter_data.tail()) # inspect labels
+#print(winter_data.head(), winter_data.tail()) # inspect labels
 
 # Generate ridge plot to compare temperature distributions by century
 plt.figure(figsize=(12, 6))
@@ -157,5 +160,4 @@ plt.title('Cape Town winter temperature distribution by century', fontsize=14)
 plt.xlabel('Average winter temperature (°C)')
 plt.ylabel('Density')
 plt.grid(axis='y', alpha=0.3)
-plt.show()
-
+#plt.show()
