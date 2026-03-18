@@ -3,6 +3,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy import stats
+import numpy as np
 
 ### Day 1 ###
 
@@ -50,18 +51,28 @@ print(ct_season_df_preview)
 
 ### Day 3 ###
 
-# Create pivot table to inspect trends
-season_trends = ct_df.pivot_table(values = 'AverageTemperature',
-                                  index = 'year',
-                                  columns = 'season')
-winter_trend = season_trends['Winter'].dropna().tail(50) # annual temperature series for winter seasons
-print(winter_trend.describe()) # inspect summary statistics for winter temperatures
-first_decade_avg = winter_trend.head(10).mean() # calculate average temperature during first decade (starting 1964)
-last_decade_avg = winter_trend.tail(10).mean() # calculate average temperature during first decade (ending 2013)
-temp_shift = last_decade_avg - first_decade_avg
-print(f"\n ---------- \nAverage winter temperature in first decade (1964 - 1973): {first_decade_avg:.2f} °C")
-print(f"Average winter temperature in last decade (2004 - 2013): {last_decade_avg:.2f} °C")
-print(f"Five-decade winter temperature shift: {temp_shift:.2f} °C")
+# Create function to create a pivot table to extract seasonal mean temperature shift
+def season_trends(climate_df: pd.DataFrame,
+                  season: str,
+                  decades_timespan: int):
+    season_trends_pivot = climate_df.pivot_table(values = 'AverageTemperature', index = 'year', columns = 'season')
+    years_timespan = decades_timespan * 10
+    season_trend = season_trends_pivot[season].dropna().tail(years_timespan)
+    start_year = season_trend.index.min()
+    end_year = season_trend.index.max()
+    first_decade_avg: float = season_trend.head(10).mean()  # calculate average temperature during first decade (starting 1964)
+    last_decade_avg: float = season_trend.tail(10).mean()  # calculate average temperature during first decade (ending 2013)
+    temp_shift: float = last_decade_avg - first_decade_avg
+    season_trend_summary = (
+        f"\n---------- {season} mean temperature shift per decade since {start_year} ----------\n"
+        f"Mean temperature in first decade ({start_year} - {start_year+10}) : {first_decade_avg:.2f} °C\n"
+        f"Mean temperature in last decade ({end_year-10} - {end_year}): {last_decade_avg:.2f} °C\n"
+        f"Mean temperature shift over the last {decades_timespan} decades: {temp_shift:.2f} °C\n")
+    return season_trend_summary
+
+print(season_trends(climate_df = ct_df, season = 'Winter', decades_timespan = 5))
+print(season_trends(climate_df = ct_df, season = 'Winter', decades_timespan = 10))
+print(season_trends(climate_df = ct_df, season = 'Summer', decades_timespan = 10))
 
 ### Day 4 ###
 
@@ -107,7 +118,6 @@ def plot_climate_trend(climate_df: pd.DataFrame,
     plt.title(plot_title)
     plt.xlabel(x_lab)
     plt.ylabel(y_lab)
-
     plt.show()
 
 # Create plot annotated with regression statistics
@@ -115,3 +125,37 @@ title = 'Cape Town: winter warming trend (last 50 years)'
 x_label = 'Year'
 y_label = 'Average winter temp (°C)'
 plot_climate_trend(winter_data_five_decades, title, x_label, y_label, slope, r_squared)
+
+### Day 6 ###
+
+# Add century label to data (3 different approaches)
+winter_data['century'] = ((np.floor(winter_data['year'])/100)+1).astype(int) # add century labels as integers by rounding down
+winter_data['century'] = (winter_data['year'] // 100)+1 # different, more efficient logic with floor division
+def get_century_string(year): # alternatively, define function to return century as language string
+    if year < 1900:
+        return "19th"
+    elif year < 2000:
+        return "20th"
+    else:
+        return "21st"
+
+winter_data['century'] = winter_data['year'].apply(get_century_string) # apply century labels to rows
+print(winter_data.head(), winter_data.tail()) # inspect labels
+
+# Generate ridge plot to compare temperature distributions by century
+plt.figure(figsize=(12, 6))
+sns.kdeplot(data=winter_data,
+            x='AverageTemperature',
+            hue='century',
+            fill=True,
+            common_norm=False, # normalise independently to prevent small sample bias from 21st century
+            palette='colorblind',
+            alpha=0.4,
+            linewidth=0.8
+            )
+plt.title('Cape Town winter temperature distribution by century', fontsize=14)
+plt.xlabel('Average winter temperature (°C)')
+plt.ylabel('Density')
+plt.grid(axis='y', alpha=0.3)
+plt.show()
+
