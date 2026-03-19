@@ -34,7 +34,8 @@ ct_df = global_df[global_df['City'] == 'Cape Town'].copy()
 # Process date-time string variable
 ct_df['dt'] = pd.to_datetime(ct_df['dt'])
 ct_df['year'] = ct_df['dt'].dt.year
-print(f"Cape Town has environmental data from {min(ct_df['year'])} to {max(ct_df['year'])}.")
+def show_years(this_df: pd.DataFrame):
+    print(f"Cape Town has environmental data from {min(this_df['year'])} to {max(this_df['year'])}.")
 
 # Successfully integrated this project onto GitHub!
 
@@ -97,37 +98,61 @@ plt.tight_layout()
 
 ### Day 5 ###
 
-# Calculate regression statistics
-slope, intercept, r_value, p_value, std_err = stats.linregress(
-    winter_data_five_decades['year'],
-    winter_data_five_decades['AverageTemperature']
-)
-r_squared = r_value ** 2
-#stats_text = f'Slope: {slope:.4f} °C/year\n$R^2$: {r_squared:.4f}\np-value: {p_value:.4f}' #
-#print(stats_text)
+def plot_ct_season_regression(ct_climate_df: pd.DataFrame,
+                              season: str,
+                              start_year: int = None,
+                              end_year: int = None,
+                              show_stats: bool = True) -> None:
+    min_year = ct_climate_df['year'].min()
+    max_year = ct_climate_df['year'].max()
 
-# Create annotated regression plot function
-def plot_climate_trend(climate_df: pd.DataFrame,
-                       plot_title: str,
-                       x_lab: str,
-                       y_lab: str,
-                       slope_val: float,
-                       r2_val: float
-                       ) -> None:
+    # Handle default years
+    if start_year is None:
+        start_year = min_year
+        print(f"No starting year specified, using default value of {min_year}")
+    if end_year is None:
+        end_year = max_year
+        print(f"No end year specified, using default value of {max_year}")
+
+    # Ensure valid input year order
+    if start_year > end_year:
+        print(f"Invalid time interval: start year ({start_year}) must be smaller than end year ({end_year})")
+        show_years(ct_climate_df)
+        return
+
+    # Ensure start and end year are within bounds
+    if not min_year <= start_year <= max_year:
+        print(f"Invalid start year:")
+        show_years(ct_climate_df)
+        return
+    if not min_year <= end_year <= max_year:
+        print(f"Invalid end year:")
+        show_years(ct_climate_df)
+        return
+
+    # Proceed with handling and plotting
+    ct_season_data: pd.DataFrame = (
+        ct_climate_df[
+            (ct_climate_df['season'] == season) &
+            (ct_climate_df['year'].between(start_year, end_year))
+         ].groupby('year')['AverageTemperature'].mean().reset_index()
+    )
+    # Ensure df is populated
+    if ct_season_data.empty:
+        print(f"No data found for {season}.")
+        return
+
+    # Proceed with plotting
+    slope, intercept, r_value, p_value, std_err = stats.linregress(ct_season_data['year'], ct_season_data['AverageTemperature'])
+    r_squared = r_value ** 2
     plt.figure(figsize=(12, 6))
-    ax = sns.regplot(data=climate_df, x='year', y='AverageTemperature', line_kws={'color': 'red'})
-    stats_text = f"Slope: {slope_val:.4f}\n$R^2$: {r2_val:.4f}"
-    ax.text(0.8255, 0.0288, stats_text, transform=ax.transAxes, bbox=dict(facecolor='white', alpha=1, boxstyle='square', edgecolor='black', linewidth=0.8))
-    plt.title(plot_title)
-    plt.xlabel(x_lab)
-    plt.ylabel(y_lab)
+    ax = sns.regplot(data=ct_season_data, x='year', y='AverageTemperature', line_kws={'color': 'red'})
+    stats_text = f"Slope: {slope:.4f}\n$R^2$: {r_squared:.4f}"
+    if show_stats: ax.text(0.8255, 0.0288, stats_text, transform=ax.transAxes, bbox=dict(facecolor='white', alpha=1, boxstyle='square', edgecolor='black', linewidth=0.8))
+    plt.title(f"{season} mean temperature: Cape Town ({start_year} - {end_year}")
+    plt.xlabel('Year')
+    plt.ylabel(f"{season} mean temp. (°C)")
     plt.show()
-
-# Create plot annotated with regression statistics
-title = 'Cape Town: winter warming trend (last 50 years)'
-x_label = 'Year'
-y_label = 'Average winter temp (°C)'
-#plot_climate_trend(winter_data_five_decades, title, x_label, y_label, slope, r_squared)
 
 ### Day 6 ###
 
@@ -161,3 +186,10 @@ plt.xlabel('Average winter temperature (°C)')
 plt.ylabel('Density')
 plt.grid(axis='y', alpha=0.3)
 #plt.show()
+
+
+
+### Day 7 ###
+
+# Created function to plot regression trend for defined season over defined interval
+plot_ct_season_regression(ct_df, "Winter", 1500, 2013, True)
