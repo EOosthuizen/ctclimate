@@ -1,4 +1,5 @@
 # Import libraries and assign aliases for quick reference
+
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -28,18 +29,21 @@ def find_cities(kaggle_dataset: pd.DataFrame,
 
 ### Day 2 ###
 
+# Define function to subset global dataset by a specified city
+def get_city_data(city: str) -> pd.DataFrame:
+    city_data = global_df[global_df['City'] == city]
+    if city_data.empty:
+        print(f"No data found for {city} - check spelling or capitalisation")
+        return city_data
+    else:
+        print(f"Data loaded for {city}\nPreview:\n{city_data.head(3)}")
+        return city_data
+
+
 # Create data subset for Cape Town only
-ct_df = global_df[global_df['City'] == 'Cape Town'].copy()
+ct_df = get_city_data("Cape Town")
+#ct_df = global_df[global_df['City'] == 'Cape Town'].copy()
 
-# Process date-time string variable
-ct_df['dt'] = pd.to_datetime(ct_df['dt'])
-ct_df['year'] = ct_df['dt'].dt.year
-def show_years(this_df: pd.DataFrame):
-    print(f"Cape Town has environmental data from {min(this_df['year'])} to {max(this_df['year'])}.")
-
-# Successfully integrated this project onto GitHub!
-
-# Add month variable to assign seasons
 def get_season(month): # create a function that inputs a month variable and returns the corresponding austral season
     if month in [12, 1, 2]:
         return 'Summer'
@@ -50,8 +54,30 @@ def get_season(month): # create a function that inputs a month variable and retu
     else:
         return 'Spring'
 
-ct_df['month'] = ct_df['dt'].dt.month
-ct_df['season'] = ct_df['month'].apply(get_season)
+# Process date-time string variable
+def add_datetime_seasons(city_df: pd.DataFrame) -> pd.DataFrame:
+    city_data = city_df.copy()
+    city_data['dt'] = pd.to_datetime(city_data['dt'])
+    city_data['year'] = city_data['dt'].dt.year
+    city_data['month'] = city_data['dt'].dt.month
+    city_data['season'] = city_data['month'].apply(get_season)
+    print(f"Added season data\nPreview:\n{city_data.head(3)}")
+    return city_data
+
+ct_df = add_datetime_seasons(ct_df)
+
+def city_show_years(city:str = None):
+    city_data = add_datetime_seasons(get_city_data(city))
+    city_start_year = city_data['year'].min()
+    city_end_year = city_data['year'].max()
+    print(f"{city} has environmental data from {city_start_year} to {city_end_year}.")
+
+# Successfully integrated this project onto GitHub!
+
+# Add month variable to assign seasons
+
+
+
 
 ### Day 3 ###
 
@@ -98,58 +124,60 @@ plt.tight_layout()
 
 ### Day 5 ###
 
-def plot_ct_season_regression(ct_climate_df: pd.DataFrame,
-                              season: str,
-                              start_year: int = None,
-                              end_year: int = None,
-                              show_stats: bool = True) -> None:
-    min_year = ct_climate_df['year'].min()
-    max_year = ct_climate_df['year'].max()
-
+def check_years(city: str,
+                start_year: int,
+                end_year: int) -> bool:
     # Handle default years
-    if start_year is None:
-        start_year = min_year
-        print(f"No starting year specified, using default value of {min_year}")
-    if end_year is None:
-        end_year = max_year
-        print(f"No end year specified, using default value of {max_year}")
+    if start_year is None or end_year is None:
+        print(f"Must specify start and end years!")
+        return False
 
     # Ensure valid input year order
     if start_year > end_year:
         print(f"Invalid time interval: start year ({start_year}) must be smaller than end year ({end_year})")
-        show_years(ct_climate_df)
-        return
+        return False
+
+    city_df = add_datetime_seasons(get_city_data(city))
+    min_year = city_df['year'].min()
+    max_year = city_df['year'].max()
 
     # Ensure start and end year are within bounds
-    if not min_year <= start_year <= max_year:
-        print(f"Invalid start year:")
-        show_years(ct_climate_df)
-        return
-    if not min_year <= end_year <= max_year:
-        print(f"Invalid end year:")
-        show_years(ct_climate_df)
+    if not min_year <= start_year <= max_year or not min_year <= end_year <= max_year:
+        print(f"Invalid start or end year(s) - must be between {min_year} and {max_year}")
+        return False
+    else:
+        return True
+
+def plot_city_season_regression(city: str,
+                                season: str,
+                                start_year: int = None,
+                                end_year: int = None,
+                                show_stats: bool = True) -> None:
+
+    if check_years(city, start_year, end_year) is False:
         return
 
     # Proceed with handling and plotting
-    ct_season_data: pd.DataFrame = (
-        ct_climate_df[
-            (ct_climate_df['season'] == season) &
-            (ct_climate_df['year'].between(start_year, end_year))
+    city_df = add_datetime_seasons(get_city_data(city))
+    city_season_data: pd.DataFrame = (
+        city_df[
+            (city_df['season'] == season) &
+            (city_df['year'].between(start_year, end_year))
          ].groupby('year')['AverageTemperature'].mean().reset_index()
     )
     # Ensure df is populated
-    if ct_season_data.empty:
-        print(f"No data found for {season}.")
+    if city_season_data.empty:
+        print(f"No data found for {city} during {season}.")
         return
 
     # Proceed with plotting
-    slope, intercept, r_value, p_value, std_err = stats.linregress(ct_season_data['year'], ct_season_data['AverageTemperature'])
+    slope, intercept, r_value, p_value, std_err = stats.linregress(city_season_data['year'], city_season_data['AverageTemperature'])
     r_squared = r_value ** 2
     plt.figure(figsize=(12, 6))
-    ax = sns.regplot(data=ct_season_data, x='year', y='AverageTemperature', line_kws={'color': 'red'})
+    ax = sns.regplot(data=city_season_data, x='year', y='AverageTemperature', line_kws={'color': 'red'})
     stats_text = f"Slope: {slope:.4f}\n$R^2$: {r_squared:.4f}"
     if show_stats: ax.text(0.8255, 0.0288, stats_text, transform=ax.transAxes, bbox=dict(facecolor='white', alpha=1, boxstyle='square', edgecolor='black', linewidth=0.8))
-    plt.title(f"{season} mean temperature: Cape Town ({start_year} - {end_year}")
+    plt.title(f"{season} mean temperature: {city} ({start_year} - {end_year})")
     plt.xlabel('Year')
     plt.ylabel(f"{season} mean temp. (°C)")
     plt.show()
@@ -157,6 +185,9 @@ def plot_ct_season_regression(ct_climate_df: pd.DataFrame,
 ### Day 6 ###
 
 # Add century label to data (3 different approaches)
+
+
+
 winter_data['century'] = ((np.floor(winter_data['year'])/100)+1).astype(int) # add century labels as integers by rounding down
 winter_data['century'] = (winter_data['year'] // 100)+1 # different, more efficient logic with floor division
 def get_century_string(year): # alternatively, define function to return century as language string
@@ -192,4 +223,4 @@ plt.grid(axis='y', alpha=0.3)
 ### Day 7 ###
 
 # Created function to plot regression trend for defined season over defined interval
-plot_ct_season_regression(ct_df, "Winter", 1500, 2013, True)
+plot_city_season_regression("Durban", "Winter", 1500, 2013, True)
