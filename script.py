@@ -247,7 +247,7 @@ if do_ct:
 ### Day 7 ###
 
 # Created function to plot regression trend for defined season over defined interval
-#plot_city_season_regression("Durban", "Winter", 1500, 2013, True)
+plot_city_season_regression("Durban", "Winter", 1500, 2013, True)
 
 
 ### Day 8 ###
