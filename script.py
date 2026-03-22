@@ -31,18 +31,42 @@ def find_cities(kaggle_dataset: pd.DataFrame,
 
 # Define function to subset global dataset by a specified city
 def get_city_data(city: str) -> pd.DataFrame:
-    city_data = global_df[global_df['City'] == city]
+    city_data = global_df[global_df['City'] == city].copy()
     if city_data.empty:
         print(f"No data found for {city} - check spelling or capitalisation")
+        start_letter = city[0].upper()
+        matching_cities = global_df[global_df['City'].str.startswith(start_letter)]
+        matching_cities_list = matching_cities['City'].unique().tolist
+        print(f"Did you mean one of the following cities?\n{matching_cities_list}")
         return city_data
     else:
-        print(f"Data loaded for {city}\nPreview:\n{city_data.head(3)}")
+        print(f"Data loaded for {city}")
+        raw_missing_count = city_data['AverageTemperature'].isnull().sum()
+        city_data['dt'] = pd.to_datetime(city_data['dt'])
+        city_data['year'] = city_data['dt'].dt.year
+        city_data['month'] = city_data['dt'].dt.month
+        city_data['season'] = city_data['month'].apply(get_season)
+
+        missing_mask = city_data['AverageTemperature'].isnull()
+        data_gap_summary = city_data[missing_mask].groupby('year').size()
+        print(f"There are {raw_missing_count} monthly temperature records missing for {city}:")
+        for year, count in data_gap_summary.items():
+            print(f" * {year}: {count} months missing")
+
+        print(f"Filling in missing values using linear interpolation...")
+
+        city_data['AverageTemperature'] = city_data['AverageTemperature'].interpolate("linear")
+
+        interpolated_missing_count = city_data['AverageTemperature'].isnull().sum()
+        if interpolated_missing_count > 0:
+            print(f"{interpolated_missing_count} records missing after linear interpolation! Ensure that data starts with a point to interpolate from!")
+        else:
+            print(f"All {raw_missing_count} missing values successfully interpolated")
+
+        print(f"Preview:\n{city_data.head(3)}\n{city_data.tail(3)}")
+
         return city_data
 
-
-# Create data subset for Cape Town only
-ct_df = get_city_data("Cape Town")
-#ct_df = global_df[global_df['City'] == 'Cape Town'].copy()
 
 def get_season(month): # create a function that inputs a month variable and returns the corresponding austral season
     if month in [12, 1, 2]:
@@ -54,20 +78,8 @@ def get_season(month): # create a function that inputs a month variable and retu
     else:
         return 'Spring'
 
-# Process date-time string variable
-def add_datetime_seasons(city_df: pd.DataFrame) -> pd.DataFrame:
-    city_data = city_df.copy()
-    city_data['dt'] = pd.to_datetime(city_data['dt'])
-    city_data['year'] = city_data['dt'].dt.year
-    city_data['month'] = city_data['dt'].dt.month
-    city_data['season'] = city_data['month'].apply(get_season)
-    print(f"Added season data\nPreview:\n{city_data.head(3)}")
-    return city_data
-
-ct_df = add_datetime_seasons(ct_df)
-
 def city_show_years(city:str = None):
-    city_data = add_datetime_seasons(get_city_data(city))
+    city_data = get_city_data(city)
     city_start_year = city_data['year'].min()
     city_end_year = city_data['year'].max()
     print(f"{city} has environmental data from {city_start_year} to {city_end_year}.")
@@ -107,19 +119,25 @@ def season_trends(climate_df: pd.DataFrame,
 ### Day 4 ###
 
 # Configure seaborn and plot winter temperature regression
-sns.set_theme(style = 'whitegrid', context = 'talk')
-sns.set_palette('colorblind')
-winter_data = ct_df[ct_df['season'] == "Winter"].groupby('year')['AverageTemperature'].mean().reset_index() # combine winter data into mean annual temperatures
-winter_data_five_decades = winter_data.tail(50)
+
+do_ct: bool = False
+
+if do_ct:
+    ct_df = get_city_data("Cape Town")
+
+    sns.set_theme(style = 'whitegrid', context = 'talk')
+    sns.set_palette('colorblind')
+    winter_data = ct_df[ct_df['season'] == "Winter"].groupby('year')['AverageTemperature'].mean().reset_index() # combine winter data into mean annual temperatures
+    winter_data_five_decades = winter_data.tail(50)
 # Create plot
-plt.figure(figsize=(12, 6))
-sns.regplot(data=winter_data_five_decades, x='year', y='AverageTemperature',
-            scatter_kws={'s': 50, 'alpha': 0.6},
-            line_kws={'color': 'darkred', 'lw': 3})
-plt.title('Cape Town: winter warming trend (last 50 years)')
-plt.xlabel('Year')
-plt.ylabel('Average winter temp (°C)')
-plt.tight_layout()
+    plt.figure(figsize=(12, 6))
+    sns.regplot(data=winter_data_five_decades, x='year', y='AverageTemperature',
+                scatter_kws={'s': 50, 'alpha': 0.6},
+                line_kws={'color': 'darkred', 'lw': 3})
+    plt.title('Cape Town: winter warming trend (last 50 years)')
+    plt.xlabel('Year')
+    plt.ylabel('Average winter temp (°C)')
+    plt.tight_layout()
 #plt.show() # winter temperature regression plot (no statistical annotation)
 
 ### Day 5 ###
@@ -137,7 +155,9 @@ def check_years(city: str,
         print(f"Invalid time interval: start year ({start_year}) must be smaller than end year ({end_year})")
         return False
 
-    city_df = add_datetime_seasons(get_city_data(city))
+    city_df = get_city_data(city)
+    if city_df.empty:
+        return False
     min_year = city_df['year'].min()
     max_year = city_df['year'].max()
 
@@ -154,11 +174,14 @@ def plot_city_season_regression(city: str,
                                 end_year: int = None,
                                 show_stats: bool = True) -> None:
 
-    if check_years(city, start_year, end_year) is False:
+    if not check_years(city, start_year, end_year):
         return
 
     # Proceed with handling and plotting
-    city_df = add_datetime_seasons(get_city_data(city))
+    city_df = get_city_data(city)
+    if city_df.empty:
+        print(f"No data found for {city} during {season}.")
+        return
     city_season_data: pd.DataFrame = (
         city_df[
             (city_df['season'] == season) &
@@ -186,41 +209,72 @@ def plot_city_season_regression(city: str,
 
 # Add century label to data (3 different approaches)
 
+if do_ct:
+    ct_df = get_city_data("Cape Town")
+    winter_data = ct_df[ct_df['season'] == "Winter"].groupby('year')['AverageTemperature'].mean().reset_index()
+    winter_data['century'] = ((np.floor(winter_data['year'])/100)+1).astype(int) # add century labels as integers by rounding down
+    winter_data['century'] = (winter_data['year'] // 100)+1 # different, more efficient logic with floor division
+    def get_century_string(year): # alternatively, define function to return century as language string
+        if year < 1900:
+            return "19th"
+        elif year < 2000:
+            return "20th"
+        else:
+            return "21st"
 
+    winter_data['century'] = winter_data['year'].apply(get_century_string) # apply century labels to rows
+    #print(winter_data.head(), winter_data.tail()) # inspect labels
 
-winter_data['century'] = ((np.floor(winter_data['year'])/100)+1).astype(int) # add century labels as integers by rounding down
-winter_data['century'] = (winter_data['year'] // 100)+1 # different, more efficient logic with floor division
-def get_century_string(year): # alternatively, define function to return century as language string
-    if year < 1900:
-        return "19th"
-    elif year < 2000:
-        return "20th"
-    else:
-        return "21st"
-
-winter_data['century'] = winter_data['year'].apply(get_century_string) # apply century labels to rows
-#print(winter_data.head(), winter_data.tail()) # inspect labels
-
-# Generate ridge plot to compare temperature distributions by century
-plt.figure(figsize=(12, 6))
-sns.kdeplot(data=winter_data,
-            x='AverageTemperature',
-            hue='century',
-            fill=True,
-            common_norm=False, # normalise independently to prevent small sample bias from 21st century
-            palette='colorblind',
-            alpha=0.4,
-            linewidth=0.8
-            )
-plt.title('Cape Town winter temperature distribution by century', fontsize=14)
-plt.xlabel('Average winter temperature (°C)')
-plt.ylabel('Density')
-plt.grid(axis='y', alpha=0.3)
-#plt.show()
+    # Generate ridge plot to compare temperature distributions by century
+    plt.figure(figsize=(12, 6))
+    sns.kdeplot(data=winter_data,
+                x='AverageTemperature',
+                hue='century',
+                fill=True,
+                common_norm=False, # normalise independently to prevent small sample bias from 21st century
+                palette='colorblind',
+                alpha=0.4,
+                linewidth=0.8
+                )
+    plt.title('Cape Town winter temperature distribution by century', fontsize=14)
+    plt.xlabel('Average winter temperature (°C)')
+    plt.ylabel('Density')
+    plt.grid(axis='y', alpha=0.3)
+    #plt.show()
 
 
 
 ### Day 7 ###
 
 # Created function to plot regression trend for defined season over defined interval
-plot_city_season_regression("Durban", "Winter", 1500, 2013, True)
+#plot_city_season_regression("Durban", "Winter", 1500, 2013, True)
+
+
+### Day 8 ###
+
+def plot_city_season_kde(city: str,
+                         season: str) -> None:
+    city_data = get_city_data(city)
+    if city_data.empty:
+        return
+
+    city_season_data: pd.DataFrame = city_data[city_data['season'] == season].groupby('year')['AverageTemperature'].mean().reset_index()
+    city_season_data['century'] = city_season_data['year'] // 100 + 1
+
+    plt.figure(figsize=(12, 6))
+    sns.kdeplot(data=city_season_data,
+                x='AverageTemperature',
+                hue='century',
+                fill=True,
+                common_norm=False,  # normalise independently to prevent small sample bias from 21st century
+                palette='colorblind',
+                alpha=0.4,
+                linewidth=0.8
+                )
+    plt.title(f'{city} {season} temperature distribution per century ({city_season_data['year'].min()} - {city_season_data['year'].max()})', fontsize=14)
+    plt.xlabel(f'Average {season} temperature (°C)')
+    plt.ylabel('Density')
+    plt.grid(axis='y', alpha=0.3)
+    plt.show()
+
+plot_city_season_kde("Cape Town", "Winter")
