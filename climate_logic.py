@@ -3,13 +3,22 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from pandas import DataFrame
 from scipy import stats
 import numpy as np
+from typing import Optional
 
 ### Day 1 ###
 
 # Read spreadsheet containing data
-global_df = pd.read_csv('GlobalLandTemperaturesByMajorCity.csv')
+def load_global_data() -> pd.DataFrame:
+    df: pd.DataFrame = pd.read_csv('GlobalLandTemperaturesByMajorCity.csv')
+    df['AverageTemperature'] = pd.to_numeric(df['AverageTemperature'], errors='coerce')
+    df['dt'] = pd.to_datetime(df['dt'])
+    df['year'] = df['dt'].dt.year.astype(int)
+    df['month'] = df['dt'].dt.month.astype(int)
+    df['season'] = df['month'].apply(get_season)
+    return df
 
 # Inspect unique cities in dataset
 def find_cities(kaggle_dataset: pd.DataFrame,
@@ -31,38 +40,24 @@ def find_cities(kaggle_dataset: pd.DataFrame,
 
 # Define function to subset global dataset by a specified city
 def get_city_data(city: str) -> pd.DataFrame:
-    city_data = global_df[global_df['City'] == city].copy()
+    global_data: DataFrame = load_global_data().copy()
+    city_data = global_data[global_data['City'] == city]
+
     if city_data.empty:
-        print(f"No data found for {city} - check spelling or capitalisation")
+        print(f'No data found for "{city}" - check spelling or capitalisation')
         start_letter = city[0].upper()
-        matching_cities = global_df[global_df['City'].str.startswith(start_letter)]
-        matching_cities_list = matching_cities['City'].unique().tolist
+        matching_cities = global_data[global_data['City'].str.startswith(start_letter)]
+        matching_cities_list = matching_cities['City'].unique().tolist()
         print(f"Did you mean one of the following cities?\n{matching_cities_list}")
         return city_data
     else:
         print(f"Data loaded for {city}")
-        raw_missing_count = city_data['AverageTemperature'].isnull().sum()
-        city_data['dt'] = pd.to_datetime(city_data['dt'])
-        city_data['year'] = city_data['dt'].dt.year
-        city_data['month'] = city_data['dt'].dt.month
-        city_data['season'] = city_data['month'].apply(get_season)
-
         missing_mask = city_data['AverageTemperature'].isnull()
+        raw_missing_count = missing_mask.isnull().sum()
         data_gap_summary = city_data[missing_mask].groupby('year').size()
         print(f"There are {raw_missing_count} monthly temperature records missing for {city}:")
         for year, count in data_gap_summary.items():
             print(f" * {year}: {count} months missing")
-
-        print(f"Filling in missing values using linear interpolation...")
-
-        city_data['AverageTemperature'] = city_data['AverageTemperature'].interpolate("linear")
-
-        interpolated_missing_count = city_data['AverageTemperature'].isnull().sum()
-        if interpolated_missing_count > 0:
-            print(f"{interpolated_missing_count} records missing after linear interpolation! Ensure that data starts with a point to interpolate from!")
-        else:
-            print(f"All {raw_missing_count} missing values successfully interpolated")
-
         print(f"Preview:\n{city_data.head(3)}\n{city_data.tail(3)}")
 
         return city_data
@@ -142,7 +137,7 @@ if do_ct:
 
 ### Day 5 ###
 
-def check_years(city: str,
+def check_years(city_df: pd.DataFrame,
                 start_year: int,
                 end_year: int) -> bool:
     # Handle default years
@@ -155,7 +150,6 @@ def check_years(city: str,
         print(f"Invalid time interval: start year ({start_year}) must be smaller than end year ({end_year})")
         return False
 
-    city_df = get_city_data(city)
     if city_df.empty:
         return False
     min_year = city_df['year'].min()
@@ -172,16 +166,15 @@ def plot_city_season_regression(city: str,
                                 season: str,
                                 start_year: int = None,
                                 end_year: int = None,
-                                show_stats: bool = True) -> None:
-
-    if not check_years(city, start_year, end_year):
-        return
+                                show_stats: bool = True) -> Optional[plt.Figure]:
+    city_df = get_city_data(city)
+    if not check_years(city_df, start_year, end_year):
+        return None
 
     # Proceed with handling and plotting
-    city_df = get_city_data(city)
     if city_df.empty:
         print(f"No data found for {city} during {season}.")
-        return
+        return None
     city_season_data: pd.DataFrame = (
         city_df[
             (city_df['season'] == season) &
@@ -191,19 +184,20 @@ def plot_city_season_regression(city: str,
     # Ensure df is populated
     if city_season_data.empty:
         print(f"No data found for {city} during {season}.")
-        return
+        return None
 
     # Proceed with plotting
-    slope, intercept, r_value, p_value, std_err = stats.linregress(city_season_data['year'], city_season_data['AverageTemperature'])
+    clean_city_season_data = city_season_data.dropna(subset=['AverageTemperature', 'year'])
+    slope, intercept, r_value, p_value, std_err = stats.linregress(clean_city_season_data['year'], clean_city_season_data['AverageTemperature'])
     r_squared = r_value ** 2
-    plt.figure(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12, 6))
     ax = sns.regplot(data=city_season_data, x='year', y='AverageTemperature', line_kws={'color': 'red'})
     stats_text = f"Slope: {slope:.4f}\n$R^2$: {r_squared:.4f}"
     if show_stats: ax.text(0.8255, 0.0288, stats_text, transform=ax.transAxes, bbox=dict(facecolor='white', alpha=1, boxstyle='square', edgecolor='black', linewidth=0.8))
     plt.title(f"{season} mean temperature: {city} ({start_year} - {end_year})")
     plt.xlabel('Year')
     plt.ylabel(f"{season} mean temp. (°C)")
-    plt.show()
+    return fig
 
 ### Day 6 ###
 
@@ -242,14 +236,6 @@ if do_ct:
     plt.grid(axis='y', alpha=0.3)
     #plt.show()
 
-
-
-### Day 7 ###
-
-# Created function to plot regression trend for defined season over defined interval
-plot_city_season_regression("Durban", "Winter", 1500, 2013, True)
-
-
 ### Day 8 ###
 
 def plot_city_season_kde(city: str,
@@ -277,4 +263,4 @@ def plot_city_season_kde(city: str,
     plt.grid(axis='y', alpha=0.3)
     plt.show()
 
-plot_city_season_kde("Cape Town", "Winter")
+
