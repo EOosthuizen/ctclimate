@@ -53,7 +53,7 @@ def get_city_data(city: str) -> pd.DataFrame:
     else:
         print(f"Data loaded for {city}")
         missing_mask = city_data['AverageTemperature'].isnull()
-        raw_missing_count = missing_mask.isnull().sum()
+        raw_missing_count = missing_mask.sum()
         data_gap_summary = city_data[missing_mask].groupby('year').size()
         print(f"There are {raw_missing_count} monthly temperature records missing for {city}:")
         for year, count in data_gap_summary.items():
@@ -239,15 +239,15 @@ if do_ct:
 ### Day 8 ###
 
 def plot_city_season_kde(city: str,
-                         season: str) -> None:
+                         season: str) -> Optional[plt.Figure]:
     city_data = get_city_data(city)
     if city_data.empty:
-        return
+        return None
 
     city_season_data: pd.DataFrame = city_data[city_data['season'] == season].groupby('year')['AverageTemperature'].mean().reset_index()
     city_season_data['century'] = city_season_data['year'] // 100 + 1
 
-    plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12, 6))
     sns.kdeplot(data=city_season_data,
                 x='AverageTemperature',
                 hue='century',
@@ -261,6 +261,34 @@ def plot_city_season_kde(city: str,
     plt.xlabel(f'Average {season} temperature (°C)')
     plt.ylabel('Density')
     plt.grid(axis='y', alpha=0.3)
-    plt.show()
+    return fig
+
+
+### Day 10 ###
+
+# Define function to transform data into time-series format
+def prepare_time_series(df: pd.DataFrame) -> pd.DataFrame:
+    ts = df.set_index('dt')['AverageTemperature'].resample('MS').mean()
+    ts_df = ts.to_frame(name='AverageTemperature')
+    ts_df['is_interpolated'] = ts_df['AverageTemperature'].isnull()
+    ts_df['AverageTemperature'] = ts_df['AverageTemperature'].interpolate(method='linear')
+
+    return ts_df
+
+def plot_interpolation(ts_df: pd.DataFrame) -> plt.Figure:
+    fig, ax = plt.subplots(figsize=(14, 5))
+    ax.plot(ts_df.index, ts_df['AverageTemperature'], color = 'gray', alpha = 0.3, label = "Full series")
+
+    actual = ts_df[~ts_df['is_interpolated']]
+    ax.scatter(actual.index, actual['AverageTemperature'], color = 'blue', alpha = 0.5, label = "Actual series")
+
+    interpolated = ts_df[ts_df['is_interpolated']]
+    ax.scatter(interpolated.index, interpolated['AverageTemperature'], color = 'red', alpha = 0.5, label = "Interpolated series")
+
+    ax.set_title(f"Interpolation plot")
+    ax.legend()
+
+    return fig
+
 
 

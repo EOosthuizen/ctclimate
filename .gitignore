@@ -1,7 +1,12 @@
 # Large data files
-GlobalLandTemperaturesByMajorCity.csv
+*.csv
+*.xlsx
 
 # Environment folders
 .venv/
+env/
 .conda/
-venv/
+
+# Python bytecode
+__pycache__/
+*.pyc
