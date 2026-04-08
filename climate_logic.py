@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from pandas import DataFrame
 from scipy import stats
 import numpy as np
-from typing import Optional
+from typing import Optional, List
 
 ### Day 1 ###
 
@@ -275,20 +275,24 @@ def prepare_time_series(df: pd.DataFrame) -> pd.DataFrame:
 
     return ts_df
 
-def plot_interpolation(ts_df: pd.DataFrame) -> plt.Figure:
-    fig, ax = plt.subplots(figsize=(14, 5))
-    ax.plot(ts_df.index, ts_df['AverageTemperature'], color = 'gray', alpha = 0.3, label = "Full series")
+def plot_local_interpolation(ts_df: pd.DataFrame) -> List[plt.Figure]:
+    figs = []
 
-    actual = ts_df[~ts_df['is_interpolated']]
-    ax.scatter(actual.index, actual['AverageTemperature'], color = 'blue', alpha = 0.5, label = "Actual series")
+    gap_years = pd.DatetimeIndex(ts_df[ts_df['is_interpolated']].index).year.unique()
 
-    interpolated = ts_df[ts_df['is_interpolated']]
-    ax.scatter(interpolated.index, interpolated['AverageTemperature'], color = 'red', alpha = 0.5, label = "Interpolated series")
+    for year in gap_years:
+        subset = ts_df[f"{year-1}-01-01":f"{year+1}-12-31"]
 
-    ax.set_title(f"Interpolation plot")
-    ax.legend()
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.plot(subset.index, subset['AverageTemperature'], color = 'gray', alpha = 0.3, label = "Full series")
+        ax.scatter(subset[~subset['is_interpolated']].index, subset[~subset['is_interpolated']]['AverageTemperature'], color = 'blue', alpha = 0.5, label = "Actual series")
+        ax.scatter(subset[subset['is_interpolated']].index, subset[subset['is_interpolated']]['AverageTemperature'], color = 'red', alpha = 0.5, label = "Interpolated series")
 
-    return fig
+        ax.set_title(f"Interpolation overview plot for {year-1}-01-01 to {year+1}-12-31")
+        ax.legend()
+        figs.append(fig)
+    return figs
 
-
+plot_local_interpolation(prepare_time_series(get_city_data("Cape Town")))
+plt.show()
 
