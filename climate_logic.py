@@ -7,6 +7,7 @@ from pandas import DataFrame
 from scipy import stats
 import numpy as np
 from typing import Optional, List
+from statsmodels.tsa.seasonal import seasonal_decompose
 
 ### Day 1 ###
 
@@ -128,7 +129,7 @@ if do_ct:
     plt.figure(figsize=(12, 6))
     sns.regplot(data=winter_data_five_decades, x='year', y='AverageTemperature',
                 scatter_kws={'s': 50, 'alpha': 0.6},
-                line_kws={'color': 'darkred', 'lw': 3})
+                line_kws={'color': 'red', 'lw': 3})
     plt.title('Cape Town: winter warming trend (last 50 years)')
     plt.xlabel('Year')
     plt.ylabel('Average winter temp (°C)')
@@ -282,17 +283,35 @@ def plot_local_interpolation(ts_df: pd.DataFrame) -> List[plt.Figure]:
 
     for year in gap_years:
         subset = ts_df[f"{year-1}-01-01":f"{year+1}-12-31"]
-
         fig, ax = plt.subplots(figsize=(10, 4))
         ax.plot(subset.index, subset['AverageTemperature'], color = 'gray', alpha = 0.3, label = "Full series")
         ax.scatter(subset[~subset['is_interpolated']].index, subset[~subset['is_interpolated']]['AverageTemperature'], color = 'blue', alpha = 0.5, label = "Actual series")
         ax.scatter(subset[subset['is_interpolated']].index, subset[subset['is_interpolated']]['AverageTemperature'], color = 'red', alpha = 0.5, label = "Interpolated series")
 
-        ax.set_title(f"Interpolation overview plot for {year-1}-01-01 to {year+1}-12-31")
+        ax.set_title(f"Interpolation overview plot for {year-2}-01-01 to {year+2}-12-31")
         ax.legend()
         figs.append(fig)
     return figs
 
-plot_local_interpolation(prepare_time_series(get_city_data("Cape Town")))
-plt.show()
+if do_ct:
+    (prepare_time_series(get_city_data("Cape Town")))
+    plt.show()
 
+### Day 11 ###
+
+def analyse_climate_components(ts_df: pd.DataFrame) -> plt.Figure:
+    series = ts_df['AverageTemperature']
+    decomposition = seasonal_decompose(series, model = 'additive', period = 12)
+
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(nrows=4, ncols=1, figsize=(12, 12), sharex=True)
+    plt.suptitle(f"Climate time series decomposition", fontsize=18, fontweight='bold', y=1)
+
+    decomposition.observed.plot(ax = ax1, color = 'blue', alpha = 0.5)
+    decomposition.trend.rolling(window = 60, center = True,).mean().plot(ax = ax2, color = 'red', alpha = 0.5)
+    decomposition.seasonal.plot(ax = ax3, color = 'green', alpha = 0.5)
+    decomposition.resid.plot(ax = ax4, color = 'black', marker = '.', alpha = 0.5, linestyle = 'none')
+    plt.tight_layout()
+    return fig
+
+analyse_climate_components(prepare_time_series(get_city_data("Cape Town")))
+plt.show()
