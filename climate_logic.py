@@ -18,6 +18,7 @@ def load_global_data() -> pd.DataFrame:
     df['dt'] = pd.to_datetime(df['dt'])
     df['year'] = df['dt'].dt.year.astype(int)
     df['month'] = df['dt'].dt.month.astype(int)
+    df.set_index('dt', inplace=True)
     df['season'] = df['month'].apply(get_season)
     return df
 
@@ -269,7 +270,7 @@ def plot_city_season_kde(city: str,
 
 # Define function to transform data into time-series format
 def prepare_time_series(df: pd.DataFrame) -> pd.DataFrame:
-    ts = df.set_index('dt')['AverageTemperature'].resample('MS').mean()
+    ts = df['AverageTemperature'].resample('MS').mean()
     ts_df = ts.to_frame(name='AverageTemperature')
     ts_df['is_interpolated'] = ts_df['AverageTemperature'].isnull()
     ts_df['AverageTemperature'] = ts_df['AverageTemperature'].interpolate(method='linear')
@@ -299,6 +300,7 @@ if do_ct:
 
 ### Day 11 ###
 
+# Implement a function to decompose time series into additive components
 def analyse_climate_components(ts_df: pd.DataFrame) -> plt.Figure:
     series = ts_df['AverageTemperature']
     decomposition = seasonal_decompose(series, model = 'additive', period = 12)
@@ -313,5 +315,34 @@ def analyse_climate_components(ts_df: pd.DataFrame) -> plt.Figure:
     plt.tight_layout()
     return fig
 
-analyse_climate_components(prepare_time_series(get_city_data("Cape Town")))
-plt.show()
+if do_ct:
+    analyse_climate_components(prepare_time_series(get_city_data("Cape Town")))
+    plt.show()
+
+### Day 12 ###
+
+# Define function to create heatmap of per-month temperature shift over years
+def plot_climate_heatmap(input_pivot_table):
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(input_pivot_table,
+                cmap='RdYlBu_r',
+                center=pivot_table.median().median(),
+                cbar_kws={'label': 'Temperature (°C)'})
+
+    plt.title('Cape Town temperature shifts (1857 - 2013)', fontsize=16, pad=20)
+    plt.xlabel('Month', fontsize=12)
+    plt.ylabel('Year', fontsize=12)
+
+    plt.tight_layout()
+    return plt.gcf()
+
+if do_ct:
+    heatmap_df = prepare_time_series(get_city_data("Cape Town")).copy()
+    heatmap_dt_index = pd.DatetimeIndex(heatmap_df.index) # cast generic index from heatmapping time series to a datetime index
+    heatmap_df['year'] = heatmap_dt_index.year # extract datetime components into new columns
+    heatmap_df['month'] = heatmap_dt_index.month
+
+    pivot_table = heatmap_df.pivot(index='year', columns='month', values='AverageTemperature')
+    pivot_table.columns = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    plot_climate_heatmap(pivot_table)
+    plt.show()
